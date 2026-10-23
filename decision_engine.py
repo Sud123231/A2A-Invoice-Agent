@@ -4,6 +4,7 @@ import os
 import uuid
 import re
 import httpx
+import logging
 
 
 ACTIONS = {
@@ -244,6 +245,7 @@ def validate_proposals(batch, result):
     return result
 
 
+
 async def generate_proposals(batch):
     api_key = os.getenv("AI_API_KEY")
     base_url = os.getenv("AI_BASE_URL")
@@ -256,33 +258,43 @@ async def generate_proposals(batch):
 
     prompt = build_decision_prompt(batch)
 
-    async with httpx.AsyncClient(timeout=35.0) as client:
-        response = await client.post(
-            f"{base_url.rstrip('/')}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": (
-                            "Return valid JSON only. Follow the requested "
-                            "schema and never fabricate invoice evidence."
-                        ),
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": 0,
-            },
-        )
-        response.raise_for_status()
-        payload = response.json()
+    try:
+        async with httpx.AsyncClient(timeout=35.0) as client:
+            response = await client.post(
+                f"{base_url.rstrip('/')}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "Return valid JSON only. Follow the requested "
+                                "schema and never fabricate invoice evidence."
+                            ),
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0,
+                },
+            )
 
-    content = payload["choices"][0]["message"]["content"]
-    result = json.loads(content)
+            logging.info(
+                "Invoice model API returned HTTP %s",
+                response.status_code,
+            )
+            response.raise_for_status()
+            payload = response.json()
 
-    return validate_proposals(batch, result)
+        content = payload["choices"][0]["message"]["content"]
+        result = json.loads(content)
+
+        return validate_proposals(batch, result)
+
+    except Exception:
+        logging.exception("Invoice proposal generation failed")
+        raise
