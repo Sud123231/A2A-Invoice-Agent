@@ -5,6 +5,7 @@ import uuid
 import re
 import httpx
 import logging
+import asyncio
 
 
 ACTIONS = {
@@ -258,30 +259,42 @@ async def generate_proposals(batch):
 
     prompt = build_decision_prompt(batch)
 
+    
     try:
         async with httpx.AsyncClient(timeout=35.0) as client:
-            response = await client.post(
-                f"{base_url.rstrip('/')}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": model,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "Return valid JSON only. Follow the requested "
-                                "schema and never fabricate invoice evidence."
-                            ),
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                    "response_format": {"type": "json_object"},
-                    "temperature": 0,
-                },
-            )
+            response = None
+
+            for attempt in range(2):
+                response = await client.post(
+                    f"{base_url.rstrip('/')}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "Return valid JSON only. Follow the requested "
+                                    "schema and never fabricate invoice evidence."
+                                ),
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        "response_format": {"type": "json_object"},
+                        "temperature": 0,
+                    },
+                )
+
+                if response.status_code != 503 or attempt == 1:
+                    break
+
+                logging.warning(
+                    "Gemini returned HTTP 503; retrying once."
+                )
+                await asyncio.sleep(1)
 
             logging.info(
                 "Invoice model API returned HTTP %s",
