@@ -58,13 +58,21 @@ def error_response(status_code, code, message):
     )
 
 
+
 def validate_request(request: Request):
     authorization = request.headers.get("authorization", "")
     parts = authorization.split()
 
     if len(parts) != 2 or parts[0].lower() != "bearer":
         return None, error_response(
-            401, "UNAUTHENTICATED", "A Bearer token is required."
+            401, "UNAUTHENTICATED", "A valid Bearer token is required."
+        )
+
+    expected_token = os.getenv("A2A_BEARER_TOKEN", "")
+
+    if not expected_token or parts[1] != expected_token:
+        return None, error_response(
+            401, "UNAUTHENTICATED", "The Bearer token is invalid."
         )
 
     if request.headers.get("a2a-version") != "1.0":
@@ -83,11 +91,9 @@ def validate_request(request: Request):
                 "Content-Type must be application/a2a+json.",
             )
 
-    principal = hashlib.sha256(
-        parts[1].encode("utf-8")
-    ).hexdigest()
-
+    principal = hashlib.sha256(parts[1].encode("utf-8")).hexdigest()
     return principal, None
+
 
 
 def canonical_hash(value):
