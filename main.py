@@ -5,6 +5,7 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from fastapi.responses import JSONResponse
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -16,6 +17,9 @@ from decision_engine import generate_proposals
 
 load_dotenv()
 REQUEST_LOCKS = {}
+
+class A2AJSONResponse(JSONResponse):
+    media_type = "application/a2a+json"
 
 from database import (
     IdempotencyRecord,
@@ -382,7 +386,7 @@ async def agent_card():
 
 
 
-@app.post("/a2a/message:send")
+@app.post("/a2a/message:send", response_class=A2AJSONResponse)
 async def send_message(request: Request):
     principal, error = validate_request(request)
     if error:
@@ -620,7 +624,7 @@ async def send_message(request: Request):
 
 
 
-@app.get("/a2a/tasks")
+@app.get("/a2a/tasks", response_class=A2AJSONResponse)
 async def list_tasks(request: Request):
     principal, error = validate_request(request)
     if error:
@@ -637,7 +641,7 @@ async def list_tasks(request: Request):
     return {"tasks": [task_to_dict(record) for record in records]}
 
 
-@app.get("/a2a/tasks/{task_id}")
+@app.get("/a2a/tasks/{task_id}", response_class=A2AJSONResponse)
 async def get_task(task_id: str, request: Request):
     principal, error = validate_request(request)
     if error:
@@ -658,7 +662,7 @@ async def get_task(task_id: str, request: Request):
     return task_to_dict(record)
 
 
-@app.post("/a2a/tasks/{task_id}:cancel")
+@app.post("/a2a/tasks/{task_id}:cancel", response_class=A2AJSONResponse)
 async def cancel_task(task_id: str, request: Request):
     principal, error = validate_request(request)
     if error:
