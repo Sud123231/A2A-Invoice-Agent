@@ -57,8 +57,15 @@ async def test_model():
                 content = message.get("content")
 
                 if content is not None:
-                    print("Response:", content)
-                    print("API connection successful.")
+                    print("Response:", repr(content))
+                    print("Finish reason:", choices[0].get("finish_reason"))
+
+                    try:
+                        import json
+                        print("Parsed JSON:", json.loads(content))
+                        print("API connection successful.")
+                    except json.JSONDecodeError as error:
+                        print("Invalid JSON:", error)
                 else:
                     print("Unexpected message format:", message)
                     print("Finish reason:", choices[0].get("finish_reason"))
